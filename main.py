@@ -25,6 +25,7 @@ UTF16_COLUMNS_TRACK = {
     0x5: "genre",
     0x6: "localized_file_type",
     0x8: "comment",
+    0xb: "url",
     0xc: "composer",
     0x12: "description",
     0x1B: "album_artist",
@@ -123,6 +124,7 @@ db.execute("""CREATE TABLE tracks (
     itunes_store_flavor TEXT,
     purchaser_email TEXT,
     purchaser_name TEXT,
+    url TEXT,
     binary BLOB NOT NULL
 )""")
 db.execute("CREATE TABLE tracks_metadata_raw (track_id INTEGER NOT NULL, type INTEGER NOT NULL, binary BLOB NOT NULL, FOREIGN KEY (track_id) REFERENCES tracks(id))")
@@ -146,11 +148,10 @@ def read_chunk():
 unk3_dic = {}
 
 def read_utf16_boma(b: BytesIO, subtype: int):
-    unk1, unk2, slen, unk3, unk4 = unpack_reader("<IIIII", b)
-    s = cc.read(slen).decode("utf-16")
+    unk1, encoding, slen, unk3, unk4 = unpack_reader("<IIIII", b)
     should_same(unk1, 0, "unk1")
-    should_same(unk2, 1, "unk2")
-    # should_one_of_them(unk3, [0, 1, 2, 3, 4, 5, 6], "unk3")
+    should_one_of_them(encoding, [1, 2], "unk2")
+    s = cc.read(slen).decode("utf-16" if encoding == 1 else "utf-8") # maybe ASCII?
     if unk3 != 0:
         if subtype not in unk3_dic:
             unk3_dic[subtype] = {}
@@ -221,8 +222,8 @@ while content.readable():
             subtype, = unpack_reader("<I", cc)
             should_same(fcc, b"boma", "not boma")
             db.execute("INSERT INTO tracks_metadata_raw (track_id, type, binary) VALUES (?,?,?)", [track_id, subtype, cbc])
-            column_name = UTF16_COLUMNS_TRACK.get(subtype)
-            if column_name is not None:
+            if subtype in UTF16_COLUMNS_TRACK:
+                column_name = UTF16_COLUMNS_TRACK[subtype]
                 value = read_utf16_boma(cc, subtype)
                 if column_name == "title":
                     print("TRACK:TITLE", value)
@@ -231,11 +232,9 @@ while content.readable():
                 should_same(cbc, UNKNOWN_CONST_BOMA_TRACK[subtype], f"boma chunk that considered as const, but it looks not!? please report! (subtype={subtype})")
             else:
                 try:
-                    print("WARN:TRACK:UNHANDLED_BOMA:UTF-16", subtype, hex(subtype), read_utf16_boma(cc, subtype))
+                    print("WARN:TRACK:UNHANDLED_BOMA:STRING", subtype, hex(subtype), read_utf16_boma(cc, subtype))
                 except:
-                    # pass
-                    if subtype == 0x36:
-                        print("WARN:TRACK:UNHANDLED_BOMA:BINARY", subtype, hex(subtype), cbc)
+                    print("WARN:TRACK:UNHANDLED_BOMA:BINARY", subtype, hex(subtype), cbc)
         # should_same(c.read(4), b"\xF3\x0C\x00\x00", ":(")
     else:
         print(f"skip chunk {fourcc}...")
