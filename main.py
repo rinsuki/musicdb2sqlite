@@ -119,6 +119,7 @@ db.execute("""CREATE TABLE tracks (
     track_max INTEGER,
     composer TEXT,
     genre TEXT,
+    bpm INTEGER,
     year INTEGER,
     rate_like INTEGER,
     rate_star INTEGER,
@@ -307,7 +308,8 @@ while content.readable():
         should_same(c.read(4), b"\0\0\0\0", "? 13")
 
         should_same(c.read(2), b"\0\0", "? 14.1")
-        should_one_of_them(c.read(1)[0], [0, 130, 132, 170], "?14.3 zero in many cases, but sometimes 170 / 132 / 130")
+        bpm, = c.read(1)
+        db.execute(f"UPDATE tracks SET bpm=? WHERE id=?", [bpm, track_id])
         should_same(c.read(1), b"\0", "? 14.4")
 
         should_one_of_them(c.read(1)[0], [0, 1, 2], "?15.1")
