@@ -44,7 +44,8 @@ UTF16_COLUMNS_TRACK = {
 }
 
 UNKNOWN_CONST_BOMA_TRACK = {
-    0x38: b'8\x00\x00\x00\x00\x00\x00\x00<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict/>\n</plist>\n',
+    # 0x38: coming from some old webview's purchase/redownload button?
+    # 0x38: b'8\x00\x00\x00\x00\x00\x00\x00<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict/>\n</plist>\n',
 }
 
 def should_same(actual, expected, message: str, skip=False):
@@ -264,8 +265,8 @@ while content.readable():
                 except:
                     cc.seek(seek_point)
                     # print("WARN:TRACK:UNHANDLED_BOMA:BINARY", subtype, hex(subtype), cc.read().hex(" ", 4).replace("0", "_"))
-        should_same(c.read(4), b"\0\0\0\1", "? 1")
-        should_same(c.read(4), b"\0\0\0\0", "? 2")
+        should_one_of_them(c.read(4), [b"\0\0\0\0", b"\0\0\0\1", b"\0\1\0\1", b"\0\1\0\0", b"\0\0\1\1", b"\0\0\1\0"], "? 1")
+        should_one_of_them(c.read(4), [b"\0\0\0\0", b"\1\0\0\0", b"\0\1\0\0"], "? 2")
 
         should_same(c.read(2), b"\0\0", "?3.1")
         album_is_compilation, = unpack_reader("<B", c)
@@ -273,14 +274,14 @@ while content.readable():
         db.execute(f"UPDATE tracks SET album_is_compilation=? WHERE id=?", [album_is_compilation, track_id])
         should_same(c.read(1), b"\0", "?3.2")
 
-        should_same(c.read(4), b"\0\0\0\0", "? 4")
+        should_one_of_them(c.read(4), [b"\0\0\0\0", b"\0\0\1\0"], "? 4")
 
         should_same(c.read(3), b"\0\0\0", "? 5.1")
         should_one_of_them(c.read(1)[0], [0, 1], "? 5.2 unknown flag, zero in 99% cases, but only some rare cases, this will be 1")
 
         should_same(c.read(1), b"\0", "?6.1")
         should_one_of_them(c.read(1)[0], [0, 1], "? 6.2 unknown flag, zero in 99% cases, but only some rare cases, this will be 1")
-        should_same(c.read(2), b"\0\0", "?6.3")
+        should_one_of_them(c.read(2), [b"\0\0", b"\1\0"], "?6.3")
 
         should_same(c.read(1), b"\0", "?7.1")
         should_one_of_them(c.read(1)[0], [0, 1], "? 7.2 unknown flag, sometimes 1.")
@@ -288,27 +289,27 @@ while content.readable():
         should_one_of_them(c.read(1)[0], [0, 1], "? 7.4 unknown flag, sometimes 1.")
 
         should_same(c.read(1), b"\0", "?8.1")
-        should_one_of_them(c.read(1)[0], [0, 1], "? 8.2 unknown flag, sometimes 1.")
-        should_same(c.read(2), b"\0\0", "?8.3")
+        should_one_of_them(c.read(1)[0], [0, 1, 3], "? 8.2 unknown flag, sometimes 1.")
+        should_one_of_them(c.read(2), [b"\0\0", b"\4\0", b"\6\0", b"\1\0", b"\0\1"], "?8.3")
 
         should_same(c.read(2), b"\0\0", "?9.1")
         rate_like, = unpack_reader("<B", c)
-        should_one_of_them(rate_like, [0, 2, 3], "rate_like flag is wrong")
+        should_one_of_them(rate_like, [0, 1, 2, 3], "rate_like flag is wrong")
         db.execute(f"UPDATE tracks SET rate_like=? WHERE id=?", [rate_like, track_id])
         should_same(c.read(1), b"\0", "?9.3")
 
         is_purchased_in_store, = unpack_reader("<B", c)
-        should_one_of_them(is_purchased_in_store, [0, 1], "is_purchased_in_store flag is wrong")
+        should_one_of_them(is_purchased_in_store, [0, 1, 5, 6], "is_purchased_in_store flag is wrong")
         db.execute(f"UPDATE tracks SET is_purchased_in_store=? WHERE id=?", [is_purchased_in_store, track_id])
         rate_star, = unpack_reader("<B", c)
         should_one_of_them(rate_star, [0, 20, 40, 60, 80, 100], "rate_star flag is wrong")
         db.execute(f"UPDATE tracks SET rate_star=? WHERE id=?", [rate_star, track_id])
-        should_one_of_them(c.read(1), [b"\0", b"\1", b"\3", b"\x80", b"\x81"], "?10.3")
-        should_one_of_them(c.read(1), [b"\0", b"\1", b"\3", b"\x80", b"\x81"], "?10.4")
+        should_one_of_them(c.read(1), [b"\0", b"\1", b"\2", b"\3", b"\x80", b"\x81"], "?10.3")
+        should_one_of_them(c.read(1), [b"\0", b"\1", b"\2", b"\3", b"\x80", b"\x81"], "?10.4")
 
-        should_one_of_them(c.read(1), [b"\0", b"\1", b"\3", b"\x80", b"\x81"], "?11.1")
+        should_one_of_them(c.read(1), [b"\0", b"\1", b"\2", b"\3", b"\x80", b"\x81"], "?11.1")
         should_one_of_them(c.read(1), [b"\0", b"\1", b"\3", b"\x80", b"\x81"], "?11.2")
-        should_one_of_them(c.read(1), [b"\1", b"\x80"], "?11.3")
+        should_one_of_them(c.read(1), [b"\1", b"\2", b"\3", b"\x80", b"\x81"], "?11.3")
         should_same(c.read(1), b"\x80", "?11.4")
 
         should_same(c.read(4), b"\0\0\0\0", "? 12")
