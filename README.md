@@ -26,3 +26,7 @@ then script generates `library.sqlite3`, it should including all tracks/albums/a
   - [x] boma UTF-16 strings
   - [ ] other boma things
 - [ ] Playlist Information
+
+## Special Thanks
+
+- most of MusicDB file format: https://home.vollink.com/gary/playlister/musicdb.html
