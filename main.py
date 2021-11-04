@@ -105,12 +105,16 @@ db.execute("""CREATE TABLE artists (
 db.execute("CREATE TABLE artists_metadata_raw (artist_id INTEGER NOT NULL, type INTEGER NOT NULL, binary BLOB NOT NULL, FOREIGN KEY (artist_id) REFERENCES artists(id))")
 db.execute("""CREATE TABLE tracks (
     id INTEGER PRIMARY KEY NOT NULL,
+    unknown_flag INTEGER,
     title TEXT,
-    album TEXT,
     artist TEXT,
+    album TEXT,
+    album_is_compilation INTEGER,
     album_artist TEXT,
     composer TEXT,
     genre TEXT,
+    rate_like INTEGER,
+    rate_star INTEGER,
     comment TEXT,
     description TEXT,
     `group` TEXT,
@@ -124,6 +128,7 @@ db.execute("""CREATE TABLE tracks (
     composer_for_sort TEXT,
     itunes_store_flavor TEXT,
     itunes_store_movi TEXT,
+    is_purchased_in_store INTEGER,
     purchaser_email TEXT,
     purchaser_name TEXT,
     url TEXT,
@@ -217,6 +222,7 @@ while content.readable():
     elif fourcc == b"itma":
         c.read(4) # ?
         boma_counts, track_id = unpack("<Iq", c.read(4 + 8))
+        c.read(4) # ?
         db.execute("INSERT INTO tracks(id, binary) VALUES (?,?)", [track_id, bc])
         for i in range(boma_counts):
             fcc, cbc = read_chunk()
@@ -233,11 +239,70 @@ while content.readable():
             elif subtype in UNKNOWN_CONST_BOMA_TRACK:
                 should_same(cbc, UNKNOWN_CONST_BOMA_TRACK[subtype], f"boma chunk that considered as const, but it looks not!? please report! (subtype={subtype})")
             else:
+                seek_point = cc.tell()
                 try:
                     print("WARN:TRACK:UNHANDLED_BOMA:STRING", subtype, hex(subtype), read_utf16_boma(cc, subtype))
                 except:
-                    print("WARN:TRACK:UNHANDLED_BOMA:BINARY", subtype, hex(subtype), cbc)
-        # should_same(c.read(4), b"\xF3\x0C\x00\x00", ":(")
+                    cc.seek(seek_point)
+                    # print("WARN:TRACK:UNHANDLED_BOMA:BINARY", subtype, hex(subtype), cc.read().hex(" ", 4).replace("0", "_"))
+        should_same(c.read(4), b"\0\0\0\1", "? 1")
+        should_same(c.read(4), b"\0\0\0\0", "? 2")
+
+        should_same(c.read(2), b"\0\0", "?3.1")
+        album_is_compilation, = unpack_reader("<B", c)
+        should_one_of_them(album_is_compilation, [0, 1], "album_is_complation flag is wrong")
+        db.execute(f"UPDATE tracks SET album_is_compilation=? WHERE id=?", [album_is_compilation, track_id])
+        should_same(c.read(1), b"\0", "?3.2")
+
+        should_same(c.read(4), b"\0\0\0\0", "? 4")
+
+        should_same(c.read(3), b"\0\0\0", "? 5.1")
+        should_one_of_them(c.read(1)[0], [0, 1], "? 5.2 unknown flag, zero in 99% cases, but only some rare cases, this will be 1")
+
+        should_same(c.read(1), b"\0", "?6.1")
+        should_one_of_them(c.read(1)[0], [0, 1], "? 6.2 unknown flag, zero in 99% cases, but only some rare cases, this will be 1")
+        should_same(c.read(2), b"\0\0", "?6.3")
+
+        should_same(c.read(1), b"\0", "?7.1")
+        should_one_of_them(c.read(1)[0], [0, 1], "? 7.2 unknown flag, sometimes 1.")
+        should_one_of_them(c.read(1)[0], [0, 1], "? 7.3 unknown flag, sometimes 1.")
+        should_one_of_them(c.read(1)[0], [0, 1], "? 7.4 unknown flag, sometimes 1.")
+
+        should_same(c.read(1), b"\0", "?8.1")
+        should_one_of_them(c.read(1)[0], [0, 1], "? 8.2 unknown flag, sometimes 1.")
+        should_same(c.read(2), b"\0\0", "?8.3")
+
+        should_same(c.read(2), b"\0\0", "?9.1")
+        rate_like, = unpack_reader("<B", c)
+        should_one_of_them(rate_like, [0, 2, 3], "rate_like flag is wrong")
+        db.execute(f"UPDATE tracks SET rate_like=? WHERE id=?", [rate_like, track_id])
+        should_same(c.read(1), b"\0", "?9.3")
+
+        is_purchased_in_store, = unpack_reader("<B", c)
+        should_one_of_them(is_purchased_in_store, [0, 1], "is_purchased_in_store flag is wrong")
+        db.execute(f"UPDATE tracks SET is_purchased_in_store=? WHERE id=?", [is_purchased_in_store, track_id])
+        rate_star, = unpack_reader("<B", c)
+        should_one_of_them(rate_star, [0, 20, 40, 60, 80, 100], "rate_star flag is wrong")
+        db.execute(f"UPDATE tracks SET rate_star=? WHERE id=?", [rate_star, track_id])
+        should_one_of_them(c.read(1), [b"\0", b"\1", b"\3", b"\x80", b"\x81"], "?10.3")
+        should_one_of_them(c.read(1), [b"\0", b"\1", b"\3", b"\x80", b"\x81"], "?10.4")
+
+        should_one_of_them(c.read(1), [b"\0", b"\1", b"\3", b"\x80", b"\x81"], "?11.1")
+        should_one_of_them(c.read(1), [b"\0", b"\1", b"\3", b"\x80", b"\x81"], "?11.2")
+        should_one_of_them(c.read(1), [b"\1", b"\x80"], "?11.3")
+        should_same(c.read(1), b"\x80", "?11.4")
+
+        should_same(c.read(4), b"\0\0\0\0", "? 12")
+        should_same(c.read(4), b"\0\0\0\0", "? 13")
+
+        should_same(c.read(2), b"\0\0", "? 14.1")
+        should_one_of_them(c.read(1)[0], [0, 130, 132, 170], "?14.3 zero in many cases, but sometimes 170 / 132 / 130")
+        should_same(c.read(1), b"\0", "? 14.4")
+
+        db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [c.read(1)[0], track_id])
+
+        # db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [1 if c.read(1)[0] & 1 else 0, track_id])
+        # should_one_of_them(c.read(4), [b'\x00\x01\x01\x01', b'\x00\x01\x01\x00', b'\x00\x01\x00\x01', b'\x00\x00\x00\x01', b'\x00\0\0\0'], "? 7")
     else:
         print(f"skip chunk {fourcc}...")
 with open("dump.sql", "w") as f:
