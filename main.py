@@ -109,12 +109,18 @@ db.execute("""CREATE TABLE tracks (
     title TEXT,
     artist TEXT,
     album TEXT,
+    album_id INTEGER,
     album_is_compilation INTEGER,
     album_artist TEXT,
+    album_artist_or_artist_id INTEGER,
+    track INTEGER,
+    track_max INTEGER,
     composer TEXT,
     genre TEXT,
+    year INTEGER,
     rate_like INTEGER,
     rate_star INTEGER,
+    stop_position_msec INTEGER,
     comment TEXT,
     description TEXT,
     `group` TEXT,
@@ -132,7 +138,9 @@ db.execute("""CREATE TABLE tracks (
     purchaser_email TEXT,
     purchaser_name TEXT,
     url TEXT,
-    binary BLOB NOT NULL
+    binary BLOB NOT NULL,
+    FOREIGN KEY (album_artist_or_artist_id) REFERENCES artists(id),
+    FOREIGN KEY (album_id) REFERENCES albums(id)
 )""")
 db.execute("CREATE TABLE tracks_metadata_raw (track_id INTEGER NOT NULL, type INTEGER NOT NULL, binary BLOB NOT NULL, FOREIGN KEY (track_id) REFERENCES tracks(id))")
 
@@ -299,7 +307,51 @@ while content.readable():
         should_one_of_them(c.read(1)[0], [0, 130, 132, 170], "?14.3 zero in many cases, but sometimes 170 / 132 / 130")
         should_same(c.read(1), b"\0", "? 14.4")
 
-        db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [c.read(1)[0], track_id])
+        should_one_of_them(c.read(1)[0], [0, 1, 2], "?15.1")
+        should_same(c.read(3), b"\0\0\0", "? 15.2")
+
+        should_same(c.read(2), b"\0\0", "? 16.1")
+        should_one_of_them(c.read(1)[0], [0, 1, 2, 3], "?16.3")
+        should_same(c.read(1), b"\0", "? 16.4")
+
+        should_one_of_them(c.read(1)[0], [0, 153], "?17.1")
+        should_same(c.read(3), b"\0\0\0", "? 17.2")
+
+        should_same(c.read(4), b"\0\0\0\0", "? 18")
+        should_same(c.read(4), b"\0\0\0\0", "? 19")
+
+        c.read(4) # ?
+
+        should_one_of_them(unpack_reader("<I", c)[0], [1, 32], "? 21, 1 for music, 32 for music video?")
+        should_same(unpack_reader("<I", c)[0], 1, "? 22")
+        track_max, = unpack_reader("<I", c) # 23
+        db.execute(f"UPDATE tracks SET track_max=? WHERE id=?", [track_max, track_id])
+        should_same(c.read(4), b"\0\0\0\0", "? 24")
+        should_same(c.read(4), b"\0\0\0\0", "? 25")
+        should_same(c.read(4), b"\0\0\0\0", "? 26")
+        should_same(c.read(4), b"\0\0\0\0", "? 27")
+        should_same(c.read(4), b"\0\0\0\0", "? 28")
+        should_same(c.read(4), b"\0\0\0\0", "? 29")
+        should_same(c.read(4), b"\0\0\0\0", "? 30")
+        should_same(c.read(4), b"\0\0\0\0", "? 31")
+        stop_position_msec, = unpack_reader("<I", c) # 32
+        db.execute(f"UPDATE tracks SET stop_position_msec=? WHERE id=?", [stop_position_msec, track_id])
+        should_same(c.read(4), b"\0\0\0\0", "? 33")
+        track, = unpack_reader("<I", c) # 34
+        db.execute(f"UPDATE tracks SET track=? WHERE id=?", [track, track_id])
+        should_same(c.read(4), b"\0\0\0\0", "? 35")
+        year, album_id, album_artist_or_artist_id = unpack_reader("<Iqq", c) # 36,37~38,39~40
+        if year > 0:
+            db.execute(f"UPDATE tracks SET year=? WHERE id=?", [year, track_id])
+        db.execute(f"UPDATE tracks SET album_id=? WHERE id=?", [album_id, track_id])
+        db.execute(f"UPDATE tracks SET album_artist_or_artist_id=? WHERE id=?", [album_artist_or_artist_id, track_id])
+        should_same(c.read(4), b"\0\0\0\0", "? 35")
+        should_same(c.read(4), b"\0\0\0\0", "? 36")
+        should_same(c.read(4), b"\0\0\0\0", "? 37")
+        should_same(c.read(4), b"\0\0\0\0", "? 38")
+
+        # db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [c.read(1)[0], track_id])
+        db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [unpack_reader("<i", c)[0], track_id])
 
         # db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [1 if c.read(1)[0] & 1 else 0, track_id])
         # should_one_of_them(c.read(4), [b'\x00\x01\x01\x01', b'\x00\x01\x01\x00', b'\x00\x01\x00\x01', b'\x00\x00\x00\x01', b'\x00\0\0\0'], "? 7")
