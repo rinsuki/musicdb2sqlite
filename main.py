@@ -14,6 +14,10 @@ UTF16_COLUMNS_ALBUM = {
     301: "artist",
     302: "album_artist",
 }
+UTF16_COLUMNS_ARTIST = {
+    400: "name",
+    401: "name_for_sort",
+}
 UTF16_COLUMNS_TRACK = {
     0x2: "title",
     0x3: "album",
@@ -86,6 +90,13 @@ db.execute("""CREATE TABLE albums(
     binary BLOB NOT NULL
 )""")
 db.execute("CREATE TABLE albums_metadata_raw (album_id INTEGER NOT NULL, type INTEGER NOT NULL, binary BLOB NOT NULL, FOREIGN KEY (album_id) REFERENCES albums(id))")
+db.execute("""CREATE TABLE artists (
+    id INTEGER PRIMARY KEY NOT NULL,
+    name TEXT,
+    name_for_sort TEXT,
+    binary BLOB NOT NULL
+)""")
+db.execute("CREATE TABLE artists_metadata_raw (artist_id INTEGER NOT NULL, type INTEGER NOT NULL, binary BLOB NOT NULL, FOREIGN KEY (artist_id) REFERENCES artists(id))")
 db.execute("""CREATE TABLE tracks (
     id INTEGER PRIMARY KEY NOT NULL,
     title TEXT,
@@ -175,6 +186,27 @@ while content.readable():
                 print("WARN:ALBUM:UNHANDLED_BOMA", subtype, hex(subtype), read_utf16_boma(cc, subtype))
                 # except:
                     # print("cant", subtype, hex(subtype), cbc)
+    elif fourcc == b"iAma":
+        c.read(4)
+        boma_counts, artist_id = unpack("<Iq", c.read(4 + 8))
+        db.execute("INSERT INTO artists(id, binary) VALUES (?,?)", [artist_id, bc])
+        for i in range(boma_counts):
+            fcc, cbc = read_chunk()
+            cc = BytesIO(cbc)
+            subtype, = unpack_reader("<I", cc)
+            should_same(fcc, b"boma", "not boma")
+            db.execute("INSERT INTO artists_metadata_raw (artist_id, type, binary) VALUES (?,?,?)", [artist_id, subtype, cbc])
+            column_name = UTF16_COLUMNS_ARTIST.get(subtype)
+            if column_name is not None:
+                value = read_utf16_boma(cc, subtype)
+                if column_name == "title":
+                    print("ALBUM:TITLE", value)
+                db.execute(f"UPDATE artists SET {column_name}=? WHERE id=?", [value, artist_id])
+            else:
+                try:
+                    print("WARN:ARTIST:UNHANDLED_BOMA", subtype, hex(subtype), read_utf16_boma(cc, subtype))
+                except:
+                    print("WARN:ARTIST:UNHANDLED_BOMA_BINARY", subtype, hex(subtype), cbc)
     elif fourcc == b"itma":
         c.read(4) # ?
         boma_counts, track_id = unpack("<Iq", c.read(4 + 8))
@@ -199,8 +231,8 @@ while content.readable():
                     if subtype == 0x36:
                         print("WARN:TRACK:UNHANDLED_BOMA:BINARY", subtype, hex(subtype), cbc)
         # should_same(c.read(4), b"\xF3\x0C\x00\x00", ":(")
-    elif fourcc == b"boma":
-        print("unexpected boma...")
+    else:
+        print(f"skip chunk {fourcc}...")
 with open("dump.sql", "w") as f:
     for line in db.iterdump():
         f.write(line)
