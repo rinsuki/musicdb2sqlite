@@ -397,15 +397,17 @@ while content.readable():
         db.execute(f"UPDATE tracks SET album_artist_sort_order=? WHERE id=?", [album_artist_sort_order, track_id])
         db.execute(f"UPDATE tracks SET album_artist_or_artist_sort_order=? WHERE id=?", [album_artist_or_artist_sort_order, track_id])
         unknown_flag_65, unknown_flag_66_67 = unpack_reader("<Iq", c)
-        should_one_of_them(unknown_flag_65, [6, 0], "?65: 6 in most cases, but sometimes 0")
+        should_one_of_them(unknown_flag_65, [101, 17, 11, 6, 0], "?65: 6 in most cases, but sometimes 0")
         if unknown_flag_65 == 0:
             should_same(unknown_flag_65, unknown_flag_66_67, "?66,67: if ?65 is 0, it should 0")
         else:
             # chaos, idk. but it seems to related with album...?
             pass
-        should_same(c.read(4), b"\0\0\0\0", "? 68")
-        should_same(c.read(4), b"\0\0\0\0", "? 69")
-        should_one_of_them(unpack_reader("<i", c)[0], [0, 3, 5], "? 70 most files are 3, but some files are 5 or 0")
+        c.read(4)
+        #should_same(c.read(4), b"\0\0\0\0", "? 68")
+        c.read(4)
+        #should_same(c.read(4), b"\0\0\0\0", "? 69")
+        should_one_of_them(unpack_reader("<i", c)[0], [0, 3, 5, 8], "? 70 most files are 3, but some files are 5 or 0")
         should_same(c.read(4), b"\0\0\0\0", "? 71")
         c.read(4) # ? 72, many case are 0, but some files are not 0
         should_same(c.read(4), b"\0\0\0\0", "? 73")
