@@ -2,3 +2,4 @@
 *.sql
 *.sqlite3
 *.json
+!requirements.txt
