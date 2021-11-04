@@ -135,6 +135,13 @@ db.execute("""CREATE TABLE tracks (
     artist_for_sort TEXT,
     album_artist_for_sort TEXT,
     composer_for_sort TEXT,
+    title_sort_order INTEGER,
+    album_sort_order INTEGER,
+    artist_sort_order INTEGER,
+    genre_sort_order INTEGER,
+    composer_sort_order INTEGER,
+    album_artist_sort_order INTEGER,
+    album_artist_or_artist_sort_order INTEGER,
     itunes_store_flavor TEXT,
     itunes_store_movi TEXT,
     itunes_store_matched_id INTEGER,
@@ -308,7 +315,7 @@ while content.readable():
         should_same(c.read(4), b"\0\0\0\0", "? 13")
 
         should_same(c.read(2), b"\0\0", "? 14.1")
-        bpm, = c.read(1)
+        bpm, = c.read(1) # maybe uint16?
         db.execute(f"UPDATE tracks SET bpm=? WHERE id=?", [bpm, track_id])
         should_same(c.read(1), b"\0", "? 14.4")
 
@@ -359,12 +366,34 @@ while content.readable():
         should_same(c.read(4), b"\0\0\0\0", "? 40")
         c.read(8) # ? 41,42 sometimes not zero
         c.read(8) # ? 43,44 sometimes track_id, sometimes not
-        # db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [c.read(1)[0], track_id])
-        itunes_store_matched_id, = unpack_reader("<i", c)
+        itunes_store_matched_id, = unpack_reader("<i", c) # 45
         # iTunes Match or Genius?
         # sometimes wrong id is setted (e.g. remix mark as original song)
         if itunes_store_matched_id > 0:
             db.execute(f"UPDATE tracks SET itunes_store_matched_id=? WHERE id=?", [itunes_store_matched_id, track_id])
+        c.read(4) # 46 ?
+        c.read(4) # 47 ?
+        should_same(c.read(4), b"\0\0\0\0", "? 48")
+        c.read(4) # 49 ?
+        should_one_of_them(unpack_reader("<I", c)[0], [0, 2], "? 50, most case are 0, but sometimes 2")
+        should_one_of_them(unpack_reader("<I", c)[0], [0, 131072], "? 51, most case are 0, but sometimes 131072")
+        c.read(4) # 52 ?
+        c.read(4) # 53 ?
+        c.read(4) # 54 ?
+        c.read(4) # 55 ?
+        c.read(4) # 56 ?
+        c.read(4) # 57 ?
+        title_sort_order, album_sort_order, artist_sort_order, genre_sort_order, \
+            composer_sort_order, album_artist_sort_order, album_artist_or_artist_sort_order = unpack_reader("<iiiiiii", c) 
+        # 58, 59, 60, 61,
+        # 62, 63, 64
+        db.execute(f"UPDATE tracks SET title_sort_order=? WHERE id=?", [title_sort_order, track_id])
+        db.execute(f"UPDATE tracks SET album_sort_order=? WHERE id=?", [album_sort_order, track_id])
+        db.execute(f"UPDATE tracks SET artist_sort_order=? WHERE id=?", [artist_sort_order, track_id])
+        db.execute(f"UPDATE tracks SET genre_sort_order=? WHERE id=?", [genre_sort_order, track_id])
+        db.execute(f"UPDATE tracks SET composer_sort_order=? WHERE id=?", [composer_sort_order, track_id])
+        db.execute(f"UPDATE tracks SET album_artist_sort_order=? WHERE id=?", [album_artist_sort_order, track_id])
+        db.execute(f"UPDATE tracks SET album_artist_or_artist_sort_order=? WHERE id=?", [album_artist_or_artist_sort_order, track_id])
         db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [unpack_reader("<i", c)[0], track_id])
 
         # db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [1 if c.read(1)[0] & 1 else 0, track_id])
