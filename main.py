@@ -320,22 +320,23 @@ while content.readable():
         db.execute(f"UPDATE tracks SET bpm=? WHERE id=?", [bpm, track_id])
         should_same(c.read(1), b"\0", "? 14.4")
 
-        should_one_of_them(c.read(1)[0], [0, 1, 2], "?15.1")
+        should_one_of_them(c.read(1)[0], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "?15.1")
         should_same(c.read(3), b"\0\0\0", "? 15.2")
 
         should_same(c.read(2), b"\0\0", "? 16.1")
-        should_one_of_them(c.read(1)[0], [0, 1, 2, 3], "?16.3")
+        should_one_of_them(c.read(1)[0], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "?16.3")
         should_same(c.read(1), b"\0", "? 16.4")
 
-        should_one_of_them(c.read(1)[0], [0, 153], "?17.1")
-        should_same(c.read(3), b"\0\0\0", "? 17.2")
+        should_one_of_them(c.read(1)[0], [0, 22, 54, 96, 132, 153, 190, 197, 205, 255], "?17.1")
+        should_one_of_them(c.read(3), [b"\0\0\0", b"\xcf\xcf\xcf", b"\xff\xff\xff"], "? 17.2")
 
-        should_same(c.read(4), b"\0\0\0\0", "? 18")
+        c.read(4)
+        #should_one_of_them(c.read(4), [b"\0\0\0\0", b"\x13\xdd6a", b'\r\x1c}a', b'\xba/\xae`', b'\xafy\xa3`', b'\x96\xe6wa', b'\x96\xe6wa', b'\xda\x870a', b'\xd9\x870a', b'\x1e\x90,a', b'\xfe\x1b}a', b'F\x1c}a', b'\xfd\x1b}a', b'\xb0\x15\xbd`', b'\xf5Hea'], "? 18")
         should_same(c.read(4), b"\0\0\0\0", "? 19")
 
         c.read(4) # ?
 
-        should_one_of_them(unpack_reader("<I", c)[0], [1, 32], "? 21, 1 for music, 32 for music video?")
+        should_one_of_them(unpack_reader("<I", c)[0], [1, 16, 32, 0x100000], "? 21, 1 for music, 16 for pdf, 32 for music video?")
         should_same(unpack_reader("<I", c)[0], 1, "? 22")
         track_max, = unpack_reader("<I", c) # 23
         db.execute(f"UPDATE tracks SET track_max=? WHERE id=?", [track_max, track_id])
@@ -352,7 +353,7 @@ while content.readable():
         should_same(c.read(4), b"\0\0\0\0", "? 33")
         track, = unpack_reader("<I", c) # 34
         db.execute(f"UPDATE tracks SET track=? WHERE id=?", [track, track_id])
-        should_same(c.read(4), b"\0\0\0\0", "? 35")
+        should_one_of_them(c.read(4), [b"\0\0\0\0", b"\0\0\1\0", b"\0\0\x10\0"], "? 35")
         year, album_id, album_artist_or_artist_id = unpack_reader("<Iqq", c) # 36,37~38,39~40
         if year > 0:
             db.execute(f"UPDATE tracks SET year=? WHERE id=?", [year, track_id])
@@ -377,7 +378,7 @@ while content.readable():
         should_same(c.read(4), b"\0\0\0\0", "? 48")
         c.read(4) # 49 ?
         should_one_of_them(unpack_reader("<I", c)[0], [0, 2], "? 50, most case are 0, but sometimes 2")
-        should_one_of_them(unpack_reader("<I", c)[0], [0, 131072], "? 51, most case are 0, but sometimes 131072")
+        should_one_of_them(unpack_reader("<I", c)[0], [0, 131072, 196608], "? 51, most case are 0, but sometimes 131072")
         c.read(4) # 52 ?
         c.read(4) # 53 ?
         c.read(4) # 54 ?
