@@ -47,10 +47,12 @@ UNKNOWN_CONST_BOMA_TRACK = {
     0x38: b'8\x00\x00\x00\x00\x00\x00\x00<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict/>\n</plist>\n',
 }
 
-def should_same(actual, expected, message: str):
-    if actual != expected:
+def should_same(actual, expected, message: str, skip=False):
+    if actual != expected and not skip:
         raise Exception(f"{message} (expected: {expected}, actual: {actual})")
-def should_one_of_them(actual, expected_patterns: list, message: str):
+def should_one_of_them(actual, expected_patterns: list, message: str, skip=False):
+    if skip:
+        return
     for expected in expected_patterns:
         if actual == expected:
             return
