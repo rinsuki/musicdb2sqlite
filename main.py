@@ -136,6 +136,7 @@ db.execute("""CREATE TABLE tracks (
     composer_for_sort TEXT,
     itunes_store_flavor TEXT,
     itunes_store_movi TEXT,
+    itunes_store_matched_id INTEGER,
     is_purchased_in_store INTEGER,
     purchaser_email TEXT,
     purchaser_name TEXT,
@@ -352,7 +353,16 @@ while content.readable():
         should_same(c.read(4), b"\0\0\0\0", "? 37")
         should_same(c.read(4), b"\0\0\0\0", "? 38")
 
+        c.read(4) # ? 39
+        should_same(c.read(4), b"\0\0\0\0", "? 40")
+        c.read(8) # ? 41,42 sometimes not zero
+        c.read(8) # ? 43,44 sometimes track_id, sometimes not
         # db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [c.read(1)[0], track_id])
+        itunes_store_matched_id, = unpack_reader("<i", c)
+        # iTunes Match or Genius?
+        # sometimes wrong id is setted (e.g. remix mark as original song)
+        if itunes_store_matched_id > 0:
+            db.execute(f"UPDATE tracks SET itunes_store_matched_id=? WHERE id=?", [itunes_store_matched_id, track_id])
         db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [unpack_reader("<i", c)[0], track_id])
 
         # db.execute(f"UPDATE tracks SET unknown_flag=? WHERE id=?", [1 if c.read(1)[0] & 1 else 0, track_id])
