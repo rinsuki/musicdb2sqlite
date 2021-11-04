@@ -41,6 +41,10 @@ UTF16_COLUMNS_TRACK = {
     0x3F: "`group`",
 }
 
+UNKNOWN_CONST_BOMA_TRACK = {
+    0x38: b'8\x00\x00\x00\x00\x00\x00\x00<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict/>\n</plist>\n',
+}
+
 def should_same(actual, expected, message: str):
     if actual != expected:
         raise Exception(f"{message} (expected: {expected}, actual: {actual})")
@@ -223,6 +227,8 @@ while content.readable():
                 if column_name == "title":
                     print("TRACK:TITLE", value)
                 db.execute(f"UPDATE tracks SET {column_name}=? WHERE id=?", [value, track_id])
+            elif subtype in UNKNOWN_CONST_BOMA_TRACK:
+                should_same(cbc, UNKNOWN_CONST_BOMA_TRACK[subtype], f"boma chunk that considered as const, but it looks not!? please report! (subtype={subtype})")
             else:
                 try:
                     print("WARN:TRACK:UNHANDLED_BOMA:UTF-16", subtype, hex(subtype), read_utf16_boma(cc, subtype))
