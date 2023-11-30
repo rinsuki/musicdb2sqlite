@@ -272,7 +272,7 @@ while content.readable():
         album_is_compilation, = unpack_reader("<B", c)
         should_one_of_them(album_is_compilation, [0, 1], "album_is_complation flag is wrong")
         db.execute(f"UPDATE tracks SET album_is_compilation=? WHERE id=?", [album_is_compilation, track_id])
-        should_same(c.read(1), b"\0", "?3.2")
+        should_one_of_them(c.read(1), [b"\0", b"\1"], "?3.2")
 
         should_one_of_them(c.read(4), [b"\0\0\0\0", b"\0\0\1\0"], "? 4")
 
@@ -281,18 +281,19 @@ while content.readable():
 
         should_same(c.read(1), b"\0", "?6.1")
         should_one_of_them(c.read(1)[0], [0, 1], "? 6.2 unknown flag, zero in 99% cases, but only some rare cases, this will be 1")
-        should_one_of_them(c.read(2), [b"\0\0", b"\1\0"], "?6.3")
+        should_one_of_them(c.read(2), [b"\0\0", b"\1\0", b"\0\1"], "?6.3")
 
-        should_same(c.read(1), b"\0", "?7.1")
+        should_one_of_them(c.read(1), [b"\0", b"\1"], "?7.1")
         should_one_of_them(c.read(1)[0], [0, 1], "? 7.2 unknown flag, sometimes 1.")
         should_one_of_them(c.read(1)[0], [0, 1], "? 7.3 unknown flag, sometimes 1.")
         should_one_of_them(c.read(1)[0], [0, 1], "? 7.4 unknown flag, sometimes 1.")
 
         should_same(c.read(1), b"\0", "?8.1")
         should_one_of_them(c.read(1)[0], [0, 1, 3], "? 8.2 unknown flag, sometimes 1.")
-        should_one_of_them(c.read(2), [b"\0\0", b"\4\0", b"\6\0", b"\1\0", b"\0\1"], "?8.3")
+        should_one_of_them(c.read(2), [b"\0\0", b"\4\0", b"\6\0", b"\1\0", b"\0\1", b"\2\0", b"\3\0", b"\2\1", b"\1\1"], "?8.3")
 
         should_same(c.read(2), b"\0\0", "?9.1")
+        #should_one_of_them(c.read(1), [b"\0", b"\1"], "?3.2")
         rate_like, = unpack_reader("<B", c)
         should_one_of_them(rate_like, [0, 1, 2, 3], "rate_like flag is wrong")
         db.execute(f"UPDATE tracks SET rate_like=? WHERE id=?", [rate_like, track_id])
@@ -324,10 +325,11 @@ while content.readable():
         should_same(c.read(3), b"\0\0\0", "? 15.2")
 
         should_same(c.read(2), b"\0\0", "? 16.1")
-        should_one_of_them(c.read(1)[0], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "?16.3")
+        should_one_of_them(c.read(1)[0], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 28], "?16.3")
         should_same(c.read(1), b"\0", "? 16.4")
 
-        should_one_of_them(c.read(1)[0], [0, 22, 54, 96, 132, 153, 190, 197, 205, 255], "?17.1")
+        # should_one_of_them(c.read(1)[0], [0, 2, 5, 10, 12, 15, 17, 22, 45, 53, 54, 76, 79, 81, 84, 86, 88, 89, 91, 93, 94, 96, 98, 99, 102, 103, 116, 122, 124, 132, 137, 153, 155, 170, 173, 181, 183, 190, 197, 198, 205, 239, 244, 247, 249, 254, 255], "?17.1")
+        c.read(1)
         should_one_of_them(c.read(3), [b"\0\0\0", b"\xcf\xcf\xcf", b"\xff\xff\xff"], "? 17.2")
 
         c.read(4)
@@ -397,7 +399,7 @@ while content.readable():
         db.execute(f"UPDATE tracks SET album_artist_sort_order=? WHERE id=?", [album_artist_sort_order, track_id])
         db.execute(f"UPDATE tracks SET album_artist_or_artist_sort_order=? WHERE id=?", [album_artist_or_artist_sort_order, track_id])
         unknown_flag_65, unknown_flag_66_67 = unpack_reader("<Iq", c)
-        should_one_of_them(unknown_flag_65, [101, 17, 11, 6, 0], "?65: 6 in most cases, but sometimes 0")
+        should_one_of_them(unknown_flag_65, [101, 17, 11, 6, 0, 12, 10], "?65: 6 in most cases, but sometimes 0")
         # if unknown_flag_65 == 0:
         #     should_same(unknown_flag_65, unknown_flag_66_67, "?66,67: if ?65 is 0, it should 0")
         # else:
@@ -407,7 +409,7 @@ while content.readable():
         #should_same(c.read(4), b"\0\0\0\0", "? 68")
         c.read(4)
         #should_same(c.read(4), b"\0\0\0\0", "? 69")
-        should_one_of_them(unpack_reader("<i", c)[0], [0, 3, 5, 8], "? 70 most files are 3, but some files are 5 or 0")
+        should_one_of_them(unpack_reader("<i", c)[0], [0, 3, 5, 7, 8], "? 70 most files are 3, but some files are 5 or 0")
         should_same(c.read(4), b"\0\0\0\0", "? 71")
         c.read(4) # ? 72, many case are 0, but some files are not 0
         should_same(c.read(4), b"\0\0\0\0", "? 73")
